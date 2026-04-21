@@ -31,12 +31,12 @@ jobs:
 
       - name: Build documentation
         run: |
-          mkdocs build
+          mkdocs build --site-dir site
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: docs/site
+          path: site
 
   deploy:
     needs: build
