@@ -25,6 +25,7 @@ theme:
     - navigation.top
     - search.suggest
     - search.highlight
+    - content.code.annotate
 
 # Extensions
 markdown_extensions:
@@ -33,7 +34,11 @@ markdown_extensions:
   - tables
   - admonition
   - pymdownx.details
-  - pymdownx.superfences
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
   - pymdownx.tabbed:
       alternate_style: true
   - toc:
@@ -63,10 +68,11 @@ nav:
 plugins:
   - search:
       lang: en
-  - mermaid2
 
 # Extra
 extra:
   social:
     - icon: fontawesome/brands/github
       link: https://github.com/your-org/livestock-tracking
+extra_javascript:
+  - javascripts/config.js
