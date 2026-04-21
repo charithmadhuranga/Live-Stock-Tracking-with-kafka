@@ -135,12 +135,12 @@ logs-docker:
 
 docs-dev:
 	@echo "Starting MkDocs development server..."
-	cd docs && pip install -r requirements.txt -q && mkdocs serve
+	pip install -r docs/requirements.txt -q && mkdocs serve
 
 docs-prod:
 	@echo "Building documentation for production..."
-	cd docs && pip install -r requirements.txt -q && mkdocs build
+	pip install -r docs/requirements.txt -q && mkdocs build --site-dir site
 
 docs-serve:
 	@echo "Serving built documentation..."
-	cd docs && python -m http.server 8001
+	cd site && python -m http.server 8001

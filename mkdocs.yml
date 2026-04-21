@@ -63,6 +63,7 @@ nav:
 plugins:
   - search:
       lang: en
+  - mermaid2
 
 # Extra
 extra:
