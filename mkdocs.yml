@@ -38,8 +38,6 @@ markdown_extensions:
       alternate_style: true
   - toc:
       permalink: true
-  - pymdownx.arithmatex:
-      generic_raw: true
 
 # Navigation
 nav:

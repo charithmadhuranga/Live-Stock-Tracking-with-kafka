@@ -38,8 +38,8 @@ A real-time monitoring system for tracking cattle and livestock using GPS-enable
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-org/livestock-tracking
-cd livestock-tracking
+git clone https://github.com/charithmadhuranga/Live-Stock-Tracking-with-kafka
+cd Live-Stock-Tracking-with-kafka
 
 # Start all services
 make up
