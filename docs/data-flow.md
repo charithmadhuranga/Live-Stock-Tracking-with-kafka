@@ -6,19 +6,40 @@ This document explains how data flows through the Livestock Tracking Platform fr
 
 The platform follows a **streaming architecture** where data flows continuously from smart belts through various processing stages to the final user interface:
 
-```
-┌──────────────────────────────────────────────────────────────────────────────────┐
-│                              DATA FLOW SUMMARY                                    │
-├──────────────────────────────────────────────────────────────────────────────────┤
-│                                                                                  │
-│  1. SIMULATION     Belt → MQTT Broker                                           │
-│  2. BRIDGING       MQTT Broker → Kafka                                          │
-│  3. PROCESSING     Kafka → Worker → Database + Broadcast                        │
-│  4. API            Database → REST API                                          │
-│  5. REAL-TIME      Broadcast → WebSocket → Frontend                            │
-│  6. QUERY          Frontend → REST API → Database                               │
-│                                                                                  │
-└──────────────────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart LR
+    subgraph Stage1["1. Data Generation"]
+        Belt[Smart Belt]
+    end
+
+    subgraph Stage2["2. MQTT Bridge"]
+        MQTT[("MQTT Broker")]
+    end
+
+    subgraph Stage3["3. Processing"]
+        Kafka[("Kafka")]
+        Worker[("Worker Service")]
+    end
+
+    subgraph Stage4["4. Storage"]
+        TimescaleDB[("TimescaleDB")]
+        PostgreSQL[("PostgreSQL")]
+    end
+
+    subgraph Stage5["5. API & Frontend"]
+        API[("FastAPI")]
+        WS[("WebSocket")]
+        Frontend[("Frontend")]
+    end
+
+    Belt -->|Publish| MQTT
+    MQTT -->|Subscribe| Kafka
+    Kafka -->|Consume| Worker
+    Worker -->|Store| TimescaleDB
+    Worker -->|Check| PostgreSQL
+    Worker -->|Broadcast| API
+    API -->|Push| WS
+    WS -->|Real-time| Frontend
 ```
 
 ## Step-by-Step Data Flow
@@ -52,18 +73,14 @@ The **Bridge Service** subscribes to MQTT topics and forwards messages to Kafka:
 
 **File:** `app/worker/mqtt_to_kafka_bridge.py`
 
-```
-MQTT Topic: livestock/telemetry/+
-         │
-         ▼
-┌─────────────────┐
-│  Bridge Service │  (mqtt_to_kafka_bridge.py)
-│                 │
-│  - Subscribes   │
-│  - Parses JSON  │
-│  - Serializes   │────────────────▶ Kafka Topic: telemetry_raw
-│  - Produces     │
-└─────────────────┘
+```mermaid
+flowchart LR
+    MQTT[("MQTT Broker")]
+    Bridge[("Bridge Service")]
+    Kafka[("Kafka")]
+
+    MQTT -->|livestock/telemetry/+| Bridge
+    Bridge -->|Produce| Kafka
 ```
 
 Key operations:
@@ -79,34 +96,23 @@ The **Worker Service** consumes from Kafka and processes the data:
 
 **File:** `app/worker/kafka_consumer.py`
 
-```
-Kafka Topic: telemetry_raw
-            │
-            ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                         Worker Service                                │
-│                                                                      │
-│  ┌─────────────┐    ┌─────────────┐    ┌─────────────────────────┐  │
-│  │   Consume   │───▶│   Parse     │───▶│   Store in TimescaleDB │  │
-│  │   Message   │    │   Data      │    │                         │  │
-│  └─────────────┘    └─────────────┘    └─────────────────────────┘  │
-│         │                                      │                      │
-│         │                                      ▼                      │
-│         │              ┌────────────────────────────────────────┐   │
-│         │              │         Check Geofence                  │   │
-│         │              │  (using PostGIS ST_Contains)           │   │
-│         │              └────────────────────┬───────────────────┘   │
-│         │                                   │                        │
-│         │              ┌───────────────────▼────────────────────┐    │
-│         │              │         Broadcast to WebSocket         │    │
-│         │              │    (via API internal endpoint)        │    │
-│         │              └────────────────────────────────────────┘    │
-│         │                                   │                        │
-│         ▼                                   ▼                        │
-│  ┌────────────────────────────────────────────────────────────────┐ │
-│  │                    Process Next Message                          │ │
-│  └────────────────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph Worker["Worker Service"]
+        Consume[Consume Message]
+        Parse[Parse Data]
+        Store[(Store in TimescaleDB)]
+        Geofence[Check Geofence]
+        Broadcast[Broadcast to WebSocket]
+
+        Consume --> Parse
+        Parse --> Store
+        Store --> Geofence
+        Geofence --> Broadcast
+    end
+
+    Kafka[("Kafka")] --> Consume
+    Broadcast --> API[("API")]
 ```
 
 Processing steps:
@@ -123,35 +129,14 @@ The Worker calls an internal API endpoint to broadcast data to connected WebSock
 
 **File:** `app/api/broadcast.py`
 
-```
-Worker Process
-     │
-     │  POST /internal/broadcast-telemetry
-     │  {
-     │    "type": "telemetry",
-     │    "belt_id": "BELT-001",
-     │    "latitude": -36.595,
-     │    "longitude": 144.945,
-     │    "temperature": 38.5,
-     │    "activity_level": 5.0,
-     │    "timestamp": 1713724800
-     │  }
-     ▼
-┌────────────────────────────────────────────────────────────┐
-│                    API Server                              │
-│                                                            │
-│  ┌────────────────────┐    ┌───────────────────────────┐  │
-│  │   Broadcast        │───▶│   WebSocket Manager       │  │
-│  │   Endpoint         │    │   (ConnectionManager)     │  │
-│  └────────────────────┘    └───────────┬───────────────┘  │
-│                                        │                   │
-│                                        ▼                   │
-│                               ┌───────────────────────┐    │
-│                               │   All Connected      │    │
-│                               │   WebSocket Clients  │    │
-│                               │   Receive Message    │    │
-│                               └───────────────────────┘    │
-└────────────────────────────────────────────────────────────┘
+```mermaid
+sequenceDiagram
+    participant W as Worker
+    participant A as API Server
+    participant WS as WebSocket Clients
+
+    W->>A: POST /internal/broadcast-telemetry
+    A->>WS: Broadcast to all connections
 ```
 
 ### 5. Frontend Data Reception
@@ -160,76 +145,61 @@ The **Frontend** connects to the WebSocket and updates the UI in real-time:
 
 **File:** `frontend/src/lib/telemetry.ts`
 
-```
-WebSocket Connection
-         │
-         │  ws://localhost:8000/ws/telemetry
-         ▼
-┌─────────────────────────────────────────────────────────────┐
-│                     Frontend (React)                        │
-│                                                              │
-│  ┌─────────────────┐    ┌──────────────────────────────┐    │
-│  │  WebSocket      │───▶│   Zustand Store             │    │
-│  │  onMessage      │    │   (useTelemetryStore)       │    │
-│  │                 │    │                              │    │
-│  │  - Parse JSON   │    │  - animalPositions Map       │    │
-│  │  - Update Store │    │  - alerts Array             │    │
-│  └─────────────────┘    └──────────────┬───────────────┘    │
-│                                       │                     │
-│                                       ▼                     │
-│                              ┌──────────────────────┐      │
-│                              │   React Components   │      │
-│                              │   - MapView          │      │
-│                              │   - AnimalHealthChart│      │
-│                              │   - AlertTable       │      │
-│                              │   - Dashboard        │      │
-│                              └──────────────────────┘      │
-└─────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph Frontend["Frontend"]
+        WS[("WebSocket")]
+        Store[("Zustand Store")]
+        UI[("React Components")]
+    end
+
+    WS -->|Parse JSON| Store
+    Store -->|Update State| UI
 ```
 
 ## API Data Flow (Polling)
 
 The frontend also supports REST API polling as a fallback:
 
-```
-Frontend                         API                         Database
-   │                              │                            │
-   │  GET /api/telemetry/latest  │                            │
-   │────────────────────────────▶│                            │
-   │                              │  SELECT latest per belt_id │
-   │                              │───────────────────────────▶│
-   │                              │                            │
-   │  [{belt_id, lat, lng, ...}] │                            │
-   │◀────────────────────────────│                            │
-   │                              │                            │
-   ▼                              ▼                            ▼
+```mermaid
+sequenceDiagram
+    participant F as Frontend
+    participant A as API
+    participant DB as Database
+
+    F->>A: GET /api/telemetry/latest
+    A->>DB: SELECT latest per belt_id
+    DB-->>A: Results
+    A-->>F: JSON Response
 ```
 
 ## Geofence Checking Flow
 
+```mermaid
+flowchart TB
+    subgraph GeofenceCheck["Geofence Check Process"]
+        Step1[Get animal's current_paddock_id]
+        Step2[Get paddock geometry]
+        Step3[ST_Contains check]
+        Step4[Create alert if breach]
+    end
+
+    Telemetry[Telemetry Data] --> Step1
+    Step1 --> Step2
+    Step2 --> Step3
+    Step3 -->|Outside| Step4
+    Step4 --> Alert[(Alert)]
+    Step3 -->|Inside| Done[(OK)]
 ```
-Telemetry Data
-      │
-      ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                  Geofence Check Process                          │
-│                                                                  │
-│  1. Get animal's current_paddock_id from database              │
-│     SELECT current_paddock_id FROM animals WHERE belt_id = ?   │
-│                                                                  │
-│  2. Get paddock geometry                                        │
-│     SELECT geometry FROM paddocks WHERE id = ?                 │
-│                                                                  │
-│  3. Check if point is inside polygon                            │
-│     SELECT ST_Contains(paddock_geom, point_geom)               │
-│                                                                  │
-│  4. If NOT within paddock:                                      │
-│     - Create alert                                              │
-│     - Store in alerts table                                     │
-│     - Broadcast via WebSocket                                   │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
-```
+
+Steps:
+1. Get animal's current_paddock_id from database
+2. Get paddock geometry
+3. Check if point is inside polygon using ST_Contains
+4. If NOT within paddock:
+   - Create alert
+   - Store in alerts table
+   - Broadcast via WebSocket
 
 ## Error Handling
 

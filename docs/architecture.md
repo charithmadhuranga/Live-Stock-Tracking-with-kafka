@@ -6,36 +6,42 @@ This document provides an overview of the Livestock Tracking Platform architectu
 
 The Livestock Tracking Platform follows a **microservices-inspired architecture** with the following main components:
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                           LIVESTOCK TRACKING PLATFORM                        │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                              │
-│  ┌──────────────┐     ┌──────────────┐     ┌──────────────┐                  │
-│  │   Frontend   │────▶│     API      │◀────│   Workers   │                  │
-│  │  (Next.js)   │     │  (FastAPI)   │     │  (Kafka)    │                  │
-│  └──────┬───────┘     └──────┬───────┘     └──────┬───────┘                  │
-│         │                    │                    │                          │
-│         │                    │                    │                          │
-│         │              ┌─────┴─────┐              │                          │
-│         │              │           │              │                          │
-│         │              ▼           ▼              ▼                          │
-│         │        ┌─────────┐ ┌──────────┐ ┌──────────┐                       │
-│         │        │PostgreSQL│ │TimescaleDB│ │  Kafka   │                       │
-│         │        │+PostGIS  │ │          │ │          │                       │
-│         │        └─────────┘ └──────────┘ └──────────┘                       │
-│         │                    │                                                 │
-│         │                    │                                                 │
-│         ▼                    ▼                                                 │
-│  ┌─────────────────────────────────────────────────────────────────┐        │
-│  │                      External Systems                             │        │
-│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐ │        │
-│  │  │   Mosquitto │  │  Simulator  │  │    Smart Belts (IoT)    │ │        │
-│  │  │   (MQTT)    │  │             │  │                        │ │        │
-│  │  └─────────────┘  └─────────────┘  └─────────────────────────┘ │        │
-│  └─────────────────────────────────────────────────────────────────┘        │
-│                                                                              │
-└─────────────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph External["External Systems"]
+        SmartBelts["Smart Belts (IoT)"]
+        Simulator["Simulator"]
+    end
+
+    subgraph Infrastructure["Infrastructure"]
+        MQTT[("MQTT Broker<br/>mosquitto:1883")]
+        Kafka[("Kafka<br/>kafka:9092")]
+    end
+
+    subgraph Backend["Backend Services"]
+        Bridge["Bridge Service"]
+        Worker["Worker Service"]
+        API["FastAPI<br/>api:8000"]
+    end
+
+    subgraph Databases["Databases"]
+        PostgreSQL[("PostgreSQL<br/>+ PostGIS")]
+        TimescaleDB[("TimescaleDB")]
+    end
+
+    subgraph Frontend["Frontend"]
+        NextJS["Next.js<br/>frontend:3000"]
+    end
+
+    SmartBelts -->|MQTT| MQTT
+    Simulator -->|MQTT| MQTT
+    MQTT -->|Subscribe| Bridge
+    Bridge -->|Produce| Kafka
+    Kafka -->|Consume| Worker
+    Worker -->|Write| TimescaleDB
+    Worker -->|Check| PostgreSQL
+    Worker -->|Broadcast| API
+    API <-->|WebSocket| NextJS
 ```
 
 ## Component Overview
@@ -127,14 +133,28 @@ The **Frontend** provides the user interface:
 
 ## Data Flow
 
-```
-Smart Belt → MQTT → Bridge → Kafka → Worker → TimescaleDB
-                                         ↓
-                                   WebSocket → Frontend
-                                         ↓
-                                   PostgreSQL (Animals/Paddocks)
-                                         ↓
-                                   Geofence Check → Alerts
+```mermaid
+sequenceDiagram
+    participant S as Smart Belt
+    participant M as MQTT
+    participant B as Bridge
+    participant K as Kafka
+    participant W as Worker
+    participant T as TimescaleDB
+    participant P as PostgreSQL
+    participant A as API
+    participant F as Frontend
+
+    S->>M: Publish telemetry
+    M->>B: Forward message
+    B->>K: Produce to Kafka
+    K->>W: Consume message
+    W->>T: Store telemetry
+    W->>P: Check geofence
+    P-->>W: Geofence result
+    W->>A: Broadcast via HTTP
+    A->>F: WebSocket push
+    F-->>A: Real-time update
 ```
 
 Detailed documentation available in [Data Flow](data-flow.md)
@@ -143,18 +163,29 @@ Detailed documentation available in [Data Flow](data-flow.md)
 
 All services run in Docker containers within a shared network:
 
+```mermaid
+graph LR
+    subgraph Network["livestock-network"]
+        subgraph Ports["Ports"]
+            F3000[Frontend<br/>:3000]
+            A8000[API<br/>:8000]
+            P5432[PostgreSQL<br/>:5432]
+            T5433[TimescaleDB<br/>:5433]
+            K9092[Kafka<br/>:9092]
+            M1883[MQTT<br/>:1883]
+        end
+    end
 ```
-livestock-network
-├── postgres (5432)      - PostgreSQL with PostGIS
-├── timescale (5433)     - TimescaleDB
-├── kafka (9092)         - Kafka message broker
-├── zookeeper (2181)     - Zookeeper for Kafka
-├── mosquitto (1883)     - MQTT broker
-├── api (8000)           - FastAPI backend
-├── bridge               - MQTT to Kafka bridge
-├── worker               - Kafka consumer
-└── frontend (3000)      - Next.js frontend
-```
+
+| Service | Port | Description |
+|---------|------|-------------|
+| Frontend | 3000 | Next.js web application |
+| API | 8000 | FastAPI backend |
+| PostgreSQL | 5432 | PostgreSQL with PostGIS |
+| TimescaleDB | 5433 | TimescaleDB for telemetry |
+| Kafka | 9092 | Kafka message broker |
+| MQTT | 1883 | MQTT broker |
+| Zookeeper | 2181 | Zookeeper for Kafka |
 
 ## Development vs Production
 

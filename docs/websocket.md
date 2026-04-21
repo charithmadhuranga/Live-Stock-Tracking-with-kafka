@@ -46,6 +46,29 @@ alertsWs.onmessage = (event) => {
 };
 ```
 
+## Connection Flow
+
+```mermaid
+sequenceDiagram
+    participant Client as Frontend
+    participant API as FastAPI
+    participant Manager as ConnectionManager
+
+    Client->>API: WebSocket Connection
+    API->>Manager: Add to active_connections
+    Manager-->>Client: Connection Accepted
+    API-->>Client: Connected
+
+    loop Every Telemetry Update
+        Worker->>API: POST /internal/broadcast-telemetry
+        API->>Manager: Broadcast to all clients
+        Manager->>Client: WebSocket Message
+    end
+
+    Client->>API: Close Connection
+    API->>Manager: Remove from active_connections
+```
+
 ## Message Formats
 
 ### Telemetry Message

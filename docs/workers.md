@@ -4,31 +4,41 @@ The platform includes background worker services for processing telemetry data.
 
 ## Overview
 
+```mermaid
+flowchart TB
+    subgraph Bridge["MQTT to Kafka Bridge"]
+        MQTT[("MQTT Broker")]
+        BridgeCode[("Bridge Service")]
+    end
+
+    subgraph Worker["Kafka Consumer"]
+        Kafka[("Kafka")]
+        WorkerCode[("Worker Service")]
+    end
+
+    MQTT -->|livestock/telemetry/+| BridgeCode
+    BridgeCode -->|telemetry_raw| Kafka
+    Kafka -->|Consume| WorkerCode
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    Worker Services                        │
-├─────────────────────────────────────────────────────────┤
-│                                                             │
-│  ┌─────────────────────────────────────────────────┐           │
-│  │              mqtt_to_kafka_bridge.py            │           │
-│  │                                                      │           │
-│  │  MQTT Broker ──────────────────────────────────▶ Kafka     │
-│  │  (mosquitto)                                      │           │
-│  │  livestock/telemetry/+                           │           │
-│  └─────────────────────────────────────────────────┘           │
-│                                                             │
-│  ┌─────────────────────────────────────────────────┐           │
-│  │               kafka_consumer.py                 │           │
-│  │                                                      │           │
-│  │  Kafka ────────────────────────────────────────▶ Database  │
-│  │  telemetry_raw                                       │           │
-│  │                                                      │           │
-│  │  - Store telemetry                               │           │
-│  │  - Check geofence                                │           │
-│  │  - Broadcast to WebSocket                         │           │
-│  └─────────────────────────────────────────────────┘           │
-│                                                             │
-└─────────────────────────────────────────────────────────┘
+
+## Processing Flow
+
+```mermaid
+flowchart TB
+    subgraph Worker["Worker Service"]
+        Consume[Consume]
+        Parse[Parse]
+        Store[(Store in DB)]
+        Geofence[Check Geofence]
+        Broadcast[Broadcast]
+    end
+
+    Kafka[("Kafka")] --> Consume
+    Consume --> Parse
+    Parse --> Store
+    Store --> Geofence
+    Geofence --> Broadcast
+    Broadcast --> API[("API Server")]
 ```
 
 ## MQTT to Kafka Bridge

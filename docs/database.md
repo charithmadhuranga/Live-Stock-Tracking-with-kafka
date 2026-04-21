@@ -6,33 +6,61 @@ The platform uses two PostgreSQL databases:
 
 ## Database Architecture
 
-```
-┌──────────────────────────────────────────────────────────┐
-│                    PostgreSQL (postgres:5432)                    │
-│                                                                │
-│  ┌─────────────────┐    ┌─────────────────────────┐             │
-│  │   animals      │    │    paddocks            │             │
-│  │               │    │                      │             │
-│  │ - id          │    │ - id                  │             │
-│  │ - name        │    │ - name                │             │
-│  │ - species     │    │ - geometry (PostGIS)    │             │
-│  │ - belt_id     │    │ - area_hectares      │             │
-│  │ - paddock_id  │    │ - created_at         │             │
-│  │ - created_at │    └─────────────────────────┘             │
-│  └─────────────────┘                                      │
-└──────────────────────────────────────────────────────────┘
+```mermaid
+erDiagram
+    ANIMAL {
+        string id PK
+        string name
+        string species
+        string belt_id UK
+        string current_paddock_id FK
+        timestamp created_at
+        timestamp updated_at
+    }
 
-┌──────────────────────────────────────────────────────────┐
-│                   TimescaleDB (timescale:5433)                  │
-│                                                                  │
-│  ┌─────────────────────────────────────────────────────┐           │
-│  │              telemetry (hypertable)                              │           │
-│  │                                                                 │           │
-│  │  - id          - latitude      - activity_level              │           │
-│  │  - belt_id     - longitude    - timestamp              │           │
-│  │  - temperature                                    │           │
-│  └─────────────────────────────────────────────────────┘           │
-└──────────────────────────────────────────────────────────┘
+    PADDOCK {
+        string id PK
+        string name
+        geometry geometry
+        float area_hectares
+        timestamp created_at
+    }
+
+    TELEMETRY {
+        int id PK
+        string belt_id
+        float latitude
+        float longitude
+        float temperature
+        float activity_level
+        timestamp timestamp
+        timestamp created_at
+    }
+
+    ANIMAL ||--o{ PADDOCK : "assigned_to"
+```
+
+### PostgreSQL Database (Main)
+
+Stores animals and paddocks:
+
+```mermaid
+flowchart LR
+    subgraph PostgreSQL["PostgreSQL + PostGIS"]
+        Animals[animals table]
+        Paddocks[paddocks table]
+    end
+```
+
+### TimescaleDB (Telemetry)
+
+Stores time-series sensor data:
+
+```mermaid
+flowchart LR
+    subgraph TimescaleDB["TimescaleDB"]
+        Telemetry[telemetry hypertable]
+    end
 ```
 
 ## SQLAlchemy Models

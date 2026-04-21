@@ -98,14 +98,18 @@ make docs-serve          # Serve built documentation
 
 ## Architecture
 
-```
-Smart Belts → MQTT → Bridge → Kafka → Worker → TimescaleDB
-                                         ↓
-                                   WebSocket → Frontend
-                                         ↓
-                                   PostgreSQL (Animals/Paddocks)
-                                         ↓
-                                   Geofence Check → Alerts
+```mermaid
+flowchart LR
+    SmartBelts[Smart Belts] --> MQTT[("MQTT")]
+    MQTT --> Bridge[Bridge]
+    Bridge --> Kafka[("Kafka")]
+    Kafka --> Worker[Worker]
+    Worker --> TimescaleDB[("TimescaleDB")]
+    Worker --> WebSocket[("WebSocket")]
+    WebSocket --> Frontend[Frontend]
+    Worker --> PostgreSQL[("PostgreSQL")]
+    PostgreSQL --> Geofence[Geofence Check]
+    Geofence --> Alerts[Alerts]
 ```
 
 ## Development
