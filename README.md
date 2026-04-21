@@ -1,6 +1,6 @@
 # Livestock Tracking Platform
 
-A real-time monitoring system for tracking cattle and livestock using GPS-enabled smart belts with temperature monitoring, activity tracking, and geofence breach alerts.
+A real-time monitoring system for tracking cattle and livestock using GPS-enabled smart belts with temperature monitoring, activity tracking, and geofence breach alerts..
 
 ## Features
 
