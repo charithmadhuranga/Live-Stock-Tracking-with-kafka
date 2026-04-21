@@ -4,18 +4,14 @@ on:
   push:
     branches:
       - main
-    paths:
-      - docs/**
-      - mkdocs.yml
+      - master
+  pull_request:
+    branches:
+      - main
+      - master
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: "pages"
-  cancel-in-progress: false
 
 jobs:
   build:
@@ -44,11 +40,10 @@ jobs:
 
   deploy:
     needs: build
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
     runs-on: ubuntu-latest
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Deploy to GitHub Pages
-        id: deployment
         uses: actions/deploy-pages@v4
