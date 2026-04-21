@@ -1,0 +1,71 @@
+site_name: Livestock Tracking Platform
+site_description: Complete developer documentation for the Livestock Tracking & Monitoring Platform
+site_author: Development Team
+site_url: https://github.com/your-org/livestock-tracking
+
+repo_name: livestock-tracking
+repo_url: https://github.com/your-org/livestock-tracking
+
+# Copyright
+copyright: Copyright &copy; 2024
+
+# Theme
+theme:
+  name: material
+  palette:
+    primary: green
+    accent: green
+  icon:
+    repo: fontawesome/brands/github
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - search.suggest
+    - search.highlight
+
+# Extensions
+markdown_extensions:
+  - attr_list
+  - md_in_html
+  - tables
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - toc:
+      permalink: true
+
+# Navigation
+nav:
+  - Home: index.md
+  - Architecture:
+    - Overview: architecture.md
+    - Data Flow: data-flow.md
+  - Backend:
+    - API Documentation: backend.md
+    - WebSocket: websocket.md
+    - Worker Services: workers.md
+  - Frontend:
+    - Overview: frontend.md
+    - Components: components.md
+  - Database:
+    - Schema: database.md
+    - Models: models.md
+  - Deployment: deployment.md
+  - Contributing: contributing.md
+  - API Reference: api-reference.md
+
+# Plugins
+plugins:
+  - search:
+      lang: en
+
+# Extra
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/your-org/livestock-tracking

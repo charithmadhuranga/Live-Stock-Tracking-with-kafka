@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package livestock;
+
+message Telemetry {
+  string belt_id = 1;
+  double latitude = 2;
+  double longitude = 3;
+  float temperature = 4;
+  float activity_level = 5;
+  int64 timestamp = 6;
+}
+
+message GeofenceBreach {
+  string belt_id = 1;
+  double latitude = 2;
+  double longitude = 3;
+  string paddock_id = 4;
+  int64 timestamp = 5;
+}
